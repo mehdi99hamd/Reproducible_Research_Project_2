@@ -21,3 +21,5 @@ In this project, we're going to address the following questions:
   * Across the United States, which types of events are most harmful with respect to population health?
   
   * Across the United States, which types of events have the greatest economic consequences?
+
+You can view my work in this [HTML File](http://htmlpreview.github.io/?https://github.com/mehdi99hamd/Reproducible_Research_Project_2/blob/main/Project2.html) or in [RPubs](https://rpubs.com/mehdihamd99/Reproducible_Research_Project2)
