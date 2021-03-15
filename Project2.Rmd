@@ -1,0 +1,345 @@
+---
+title: "Reproducible Research - Project 2"
+author: "Mehdi HAMDOUNE"
+date: "3/13/2021"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+  pdf_document: default
+---
+
+## **Instroduction**
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+The data for this project come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. You can download the file from the course web site:
+
+[Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) [47Mb]
+
+There is also some documentation of the database available. Here you will find how some of the variables are constructed/defined.
+
+ * National Weather Service [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+
+ * National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
+ 
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+
+## **Loading and preprocessing the data**
+
+### 1- Loading the data
+
+```{r,  warning = FALSE, message = FALSE } 
+
+# first clean the environment and setup the working directory
+rm(list= ls())
+setwd("D:/Auto_formation/Coursera_Reproducible_Research/Project 2")
+
+# Importing The Librairies
+
+library(plyr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(rsconnect)
+
+
+# now download file
+if (!file.exists("StormData.csv.bz2")) {
+    fileURL <- 'https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2'
+    download.file(fileURL, destfile='StormData.csv.bz2', method = 'curl')
+}
+
+Storm <- read.csv(bzfile('StormData.csv.bz2'),header=TRUE, stringsAsFactors = FALSE)
+
+
+head(Storm, 2)
+```
+
+
+```{r,  warning = FALSE, message = FALSE } 
+str(Storm)
+```
+
+
+```{r,  warning = FALSE, message = FALSE } 
+summary(Storm$FATALITIES)
+summary(Storm$INJURIES)
+```
+
+### 2- Preprocessing the data
+
+#### Create the year variable
+
+```{r,  warning = FALSE, message = FALSE } 
+# Create variable year
+year <- as.numeric(format(as.Date(Storm$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y"))
+names(year) <- "Year"
+
+# Remove Date and Time column
+State <- subset(Storm, select = STATE__)
+Storm <- subset(Storm, select = -c(STATE__,BGN_DATE))
+
+# Add DateTime column
+Storm <- cbind(State, year, Storm)
+
+head(Storm$year, 5)
+```
+
+
+
+```{r,  warning = FALSE, message = FALSE } 
+
+hist(Storm$year,main = "Total number of storms", xlab = 
+       "Year", col ="cyan3", breaks = 30)
+
+```
+
+Based on the above histogram, we observe that the number of events recorded in this dataset, between 1950 and 1990 is low comparing to the number of events registered from 1990 to 2011.
+
+### Fatalities and Injuries
+
+####  Calculating the total fatalities and total injuries by year
+
+```{r,  warning = FALSE, message = FALSE } 
+
+# Calculating the total fatalities and total injuries by year
+
+casualties_year <- ddply(Storm, .(year), summarize,
+                    FATALITIES = sum(FATALITIES),
+                    INJURIES = sum(INJURIES))
+```
+
+
+#### Calculating the total fatalities and injuries by event type
+
+```{r,  warning = FALSE, message = FALSE } 
+# Calculating the total fatalities and injuries by event type
+
+casualties <- ddply(Storm, .(EVTYPE), summarize,
+                    fatalities = sum(FATALITIES),
+                    injuries = sum(INJURIES))
+```
+
+
+### Property and Crop Damage
+
+#### Creating Property and Crop Damage Variable
+
+In the raw data, the property damage is represented with two fields, a number PROPDMG in dollars and the exponent PROPDMGEXP. Similarly, the crop damage is represented using two fields, CROPDMG and CROPDMGEXP. The first step in the analysis is to calculate the property and crop damage for each event.
+
+```{r,  warning = FALSE, message = FALSE } 
+
+# Calculating the total Property and Crop Damage
+
+convertCara <- function(e){
+  if (e == "h"| e == "H")
+        return(2)
+    else if (e == "k"| e == "K")
+        return(3)
+    else if (e == "m"| e == "M")
+        return(6)
+    else if (e == "b"| e == "B")
+        return(9)
+    else 
+        return(0)
+}
+
+UnitsP <- sapply(Storm$PROPDMGEXP, FUN = convertCara)
+UnitsC <- sapply(Storm$CROPDMGEXP, FUN = convertCara)
+ 
+Storm$PropDmg <- Storm$PROPDMG * (10 ** UnitsP)
+Storm$CropDmg <- Storm$CROPDMG * (10 ** UnitsC)
+
+```
+
+```{r,  warning = FALSE, message = FALSE } 
+
+head(Storm$PropDmg, 5)
+
+```
+
+
+```{r,  warning = FALSE, message = FALSE } 
+
+head(Storm$CropDmg, 5) 
+
+```
+
+####  Calculating the total property and total crop damage by year
+
+```{r,  warning = FALSE, message = FALSE } 
+
+# Calculating the total fatalities and total injuries by year
+
+damage_year <- ddply(Storm, .(year), summarize,
+                    PropDmg = sum(PropDmg),
+                    CropDmg = sum(CropDmg))
+```
+
+####  Calculating the total property and total crop damage event type
+
+```{r,  warning = FALSE, message = FALSE } 
+
+# Calculating the total fatalities and total injuries by year
+
+damage <- ddply(Storm, .(EVTYPE), summarize,
+                    PropDmg = sum(PropDmg),
+                    CropDmg = sum(CropDmg))
+```
+
+
+## **Results**
+
+### **1- Impact on Public Health **
+
+####  Evolution of the number of fatalities and injuries over the years 
+
+```{r,  warning = FALSE, message = FALSE } 
+
+# Plotting The total fatalities and injuries by year
+
+ff <- ggplot(casualties_year, aes(year,FATALITIES)) +
+  geom_line(color = "deepskyblue1") +
+  ggtitle("Total number of fatalities by Year") +
+  ylab(expression("Total number of fatalities")) +
+  xlab("Year") +
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+fi <- ggplot(casualties_year, aes(year, INJURIES)) +
+  geom_line(color = "deepskyblue1") +
+  ggtitle("Total number of injuries by Year") +
+  ylab(expression("Total number injuries")) +
+  xlab("Year") +
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+figure <- ggarrange(ff, fi,
+                    ncol = 2, nrow = 1)
+
+figure
+
+
+```
+
+It is noticeable that the years 1990 and 1998 are the years with the most damage, in terms of the number of dead and injured people.
+
+#### Events that caused most death and injury 
+
+```{r,  warning = FALSE, message = FALSE } 
+
+head(casualties[order(casualties$fatalities, decreasing = T), ], 10)
+
+```
+
+
+```{r,  warning = FALSE, message = FALSE }
+
+fatal_events <- head(casualties[order(casualties$fatalities, decreasing = T), ], 10)
+
+injury_events <- head(casualties[order(casualties$injuries, decreasing = T), ], 10) 
+
+
+
+p1 <- ggplot(data = fatal_events ,
+             aes(x=reorder(EVTYPE, fatalities), y=fatalities, fill=fatalities)) +
+    geom_bar(stat="identity") +
+    coord_flip() +
+    ggtitle("Total number of fatalities by Event Type") +
+    ylab("Total number of fatalities") +
+    xlab("Event type") +
+    theme(plot.title = element_text(hjust = 0.5)) 
+
+p2 <- ggplot(data = injury_events,
+             aes(x=reorder(EVTYPE, injuries), y=injuries, fill=injuries)) +
+    geom_bar(stat="identity") +
+    coord_flip() + 
+    ggtitle("Total number of injuries by Event Type") +
+    ylab("Total number of injuries") +
+    xlab("Event type") +
+    theme(plot.title = element_text(hjust = 0.5)) 
+
+
+figure <- ggarrange(p1, p2,
+                    ncol = 1, nrow = 2)
+
+figure
+
+```
+
+We can observe in this figure that The Tornado is the most deadly weather events in the United State in the last 60 years.
+
+### **2- Impact on Economy**
+
+
+####  Evolution of the total property and crop damage over the years 
+
+```{r,  warning = FALSE, message = FALSE } 
+
+# Plotting The total fatalities and injuries by year
+
+ff <- ggplot(damage_year, aes(year,PropDmg)) +
+  geom_line(color = "deepskyblue1") +
+  ggtitle("Total Property damage by Year") +
+  ylab(expression("Total Property damage")) +
+  xlab("Year") +
+  xlim(1990, 2011) +
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+fi <- ggplot(damage_year, aes(year, CropDmg)) +
+  geom_line(color = "deepskyblue1") +
+  ggtitle("Total Crop damage by Year") +
+  ylab(expression("Total Crop damage")) +
+  xlab("Year") +
+  xlim(1990, 2011) +
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+figure <- ggarrange(ff, fi,
+                    ncol = 2, nrow = 1)
+
+figure
+
+
+```
+
+The record of Property and Crop damage started in 1990. So we gonna look for the event that caused the biggest property and crop damage between 1990 and 2011.
+
+#### Events that has the greatest economic consequences
+
+```{r,  warning = FALSE, message = FALSE } 
+
+property_events <- head(damage[order(damage$PropDmg, decreasing = T), ], 10)
+
+crop_events <- head(damage[order(damage$CropDmg, decreasing = T), ], 10) 
+
+
+
+p1 <- ggplot(data = property_events ,
+             aes(x=reorder(EVTYPE, PropDmg), y=PropDmg, fill=PropDmg)) +
+    geom_bar(stat="identity") +
+    coord_flip() +
+    ggtitle("Total Preperty Damage by Event Type") +
+    ylab("Total Preperty Damage") +
+    xlab("Event type") +
+    theme(plot.title = element_text(hjust = 0.5)) 
+
+p2 <- ggplot(data = crop_events,
+             aes(x=reorder(EVTYPE, CropDmg), y=CropDmg, fill=CropDmg)) +
+    geom_bar(stat="identity") +
+    coord_flip() + 
+    ggtitle("Total Crop Damage by Event Type") +
+    ylab("Total Crop Damage") +
+    xlab("Event type") +
+    theme(plot.title = element_text(hjust = 0.5)) 
+
+
+figure <- ggarrange(p1, p2,
+                    ncol = 1, nrow = 2)
+
+figure
+
+```
+
+We can see that FLOOD caused the biggest property damage in the last 20 years. Also, DROUGHT caused the greatest economic consequences in the case of Crop Damage. 
